@@ -121,7 +121,7 @@ block append styles
 //-
 block header 
     div 
-        !=project.cw_id 
+        !=project.num_id 
         |. 
         if (project.cwurl)
             a(href=project.cwurl target='_blank') #{project.acronym}
@@ -172,13 +172,13 @@ block content
         .metrics
             .label Project metrics
             .radar
-                +radar-coords(segment, ring)
+                +radar-coords(segment, segment2, ring)
                 +radar-location(model, segment, ring, 'distance')
             +sdlc-position(model.lcycle, ring)
     //- show the  tags, if any
     - if (tags)
         #tags
-            .label EC JRC tags
+            .label EC ACM tags
             div
                 - tags.forEach( (t) => {
                     .tag #{t}

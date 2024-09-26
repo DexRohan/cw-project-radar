@@ -1,9 +1,35 @@
 extends ../structure/_base
 
+mixin scaleOptions()
+    each val in [1, 2, 3, 4, 5, 6, 7, 8, 9]
+        option(value=val)= val
+
+mixin classificationOptions()
+    each val in process.env.MODEL_SEGMENTS.split(',').map(e => e.trim())
+        option(value=val)= val 
 
 mixin action(actionClass, label, route, imageStr)
     a(route=route, class=actionClass, style="cursor: pointer; margin: 0 2px;")
         img(width=16, alt=label, src=imageStr)
+
+mixin scaleOptions()
+    each val in [1, 2, 3, 4, 5, 6, 7, 8, 9]
+        option(value=val)= val
+
+mixin classificationOptions()
+    each val in process.env.MODEL_SEGMENTS.split(',').map(e => e.trim())
+        option(value=val)= val
+
+mixin acmDimension(dimension)
+    ul: li
+        input.dimension-header(type='checkbox', name=dimension.tag, value=dimension.tag)
+        label(for=dimension.tag)= dimension.name
+        li: ul
+            each term in dimension.terms
+                li 
+                    input.term(type='checkbox', name=term.tag, value=term.tag)
+                    label(for=term.tag)= term.name
+
 
 mixin projectRow(project)
     -function prettyDate(date){
@@ -17,12 +43,13 @@ mixin projectRow(project)
         - return `MTRL: ${mtrl.mrl}, ${mtrl.trl}`
     -}
     tr
-        td #{project.cw_id}
+        td #{project.num_id}
         td #{project.acronym}
         td #{project.rcn}
         td #{prettyDate(project.startDate)}
         td #{prettyDate(project.endDate)}
         td #{project.classification}
+        td #{project.secondary_classification}
         td #{prettyMTRL(project.mtrl)}
         td
             +action('edit-project', `Edit ${project.acronym}`, `/admin/project/edit/${project._id}`, 'data:image/svg+xml;base64,PD94bWwgdmVyc2lvbj0iMS4wIiBlbmNvZGluZz0idXRmLTgiPz4NCjwhLS0gR2VuZXJhdG9yOiBBZG9iZSBJbGx1c3RyYXRvciAxNy4wLjAsIFNWRyBFeHBvcnQgUGx1Zy1JbiAuIFNWRyBWZXJzaW9uOiA2LjAwIEJ1aWxkIDApICAtLT4NCjwhRE9DVFlQRSBzdmcgUFVCTElDICItLy9XM0MvL0RURCBTVkcgMS4xLy9FTiIgImh0dHA6Ly93d3cudzMub3JnL0dyYXBoaWNzL1NWRy8xLjEvRFREL3N2ZzExLmR0ZCI+DQo8c3ZnIHZlcnNpb249IjEuMSIgaWQ9ItCh0LvQvtC5XzEiIHhtbG5zPSJodHRwOi8vd3d3LnczLm9yZy8yMDAwL3N2ZyIgeG1sbnM6eGxpbms9Imh0dHA6Ly93d3cudzMub3JnLzE5OTkveGxpbmsiIHg9IjBweCIgeT0iMHB4Ig0KCSB3aWR0aD0iMTAwMHB4IiBoZWlnaHQ9IjEwMDBweCIgdmlld0JveD0iMCAwIDEwMDAgMTAwMCIgZW5hYmxlLWJhY2tncm91bmQ9Im5ldyAwIDAgMTAwMCAxMDAwIiB4bWw6c3BhY2U9InByZXNlcnZlIj4NCjxwYXRoIGQ9Ik05NjguMTYxLDMxLjgzOWMzNi40NTYsMzYuNDU2LDM2LjM5Niw5NS41NDcsMCwxMzIuMDAzbC00My45OTEsNDMuOTkxTDc5Mi4xMzgsNzUuODNsNDMuOTkxLTQzLjk5MQ0KCUM4NzIuNTgzLTQuNTg2LDkzMS43MDQtNC42MTcsOTY4LjE2MSwzMS44Mzl6IE0zMDguMjM4LDU1OS43OWwtNDMuOTYsMTc1Ljk2M2wxNzUuOTYzLTQzLjk5MWw0MzkuOTM4LTQzOS45MzhMNzQ4LjE0NywxMTkuODIxDQoJTDMwOC4yMzgsNTU5Ljc5eiBNNzQ2LjYyNyw0NzMuMzg3djQwMi4xNzVIMTI0LjQzOFYyNTMuMzczaDQwMi4yMDRsMTI0LjQwNy0xMjQuNDM4SDBWMTAwMGg4NzEuMDY0VjM0OC45MThMNzQ2LjYyNyw0NzMuMzg3eiIvPg0KPC9zdmc+DQo=')
@@ -50,7 +77,7 @@ block content
 
     .import-projects-form: form(action="/api/v1/project" method="patch" enctype="multipart/form-data" ).form-import-proejcts#import-projects-form
         .form__group.form__file-upload
-              input.form__upload(type='file', accept='text/tab-separated-values', id='importfile', name='importfile')
+              input.form__upload(type='file', accept='text/csv', id='importfile', name='importfile')
         .form__group
             button.btn#btn--import-projects Import projects
 
@@ -90,10 +117,51 @@ block content
             label.form__label(for='fundingbodylink') Funding body entry
             input#fundingbodylink.form__input(type='string', placeholder='https://cordis.europa.eu/...')
         .form__group
-            label.form__label(for='cwprojecthublink') CW ProjectHUB link
-            input#cwprojecthublink.form__input(type='string', placeholder='https://cyberwatching.eu/projects/...')
+            label.form__label(for='swprojecthublink') SWForum ProjectHUB link
+            input#swprojecthublink.form__input(type='string', placeholder='https://https://swforum.eu/project-hub')
+        
+        //- scoring options 
+        .form__group
+            label.form__label(for="mrl") MRL
+            select#mrl(name="mrl")
+                +scaleOptions()
+        .form__group
+            label.form__label(for="trl") TRL
+            select#trl(name="trl")
+                +scaleOptions()
+        .form__group
+            label.form__label(for="scoringDate") Scored on
+            input#scoringdate.form__input(type="date")
+        .form__group
+            label.form__label(for="scoreDescription") Description
+            textarea#scoreDescription.form__input(type='string', cols="70", rows="10")
+        .form__group
+            label.form__label(for="classification") Category
+            select#classification(name="classification")
+                +classificationOptions()
+        .form__group
+            label.form__label(for="classification_2nd") 2nd Category
+            select#classification_2nd(name="classification_2nd")
+                option(value='')= "- no secondary classification -"
+                +classificationOptions()
+        .form__group
+            label.form__label(for='changeSummary') Reason
+            input#changeSummary.form__input(type='string', required)
+
+        +acmDimension(acmCCS.computerSystems)
+        +acmDimension(acmCCS.softwareEngineering)
+        +acmDimension(acmCCS.computationTheory)
+        +acmDimension(acmCCS.computingMath)
+        +acmDimension(acmCCS.infoSystems)
+        +acmDimension(acmCCS.securityPrivacy)
+        +acmDimension(acmCCS.humanComputing)
+        +acmDimension(acmCCS.computingmethods)
+        +acmDimension(acmCCS.networks)
+        +acmDimension(acmCCS.appliedComputing)
+
         .form__group
             button.btn#btn--create-project Save project
+
 
     h2 Manage projects
     table
@@ -105,7 +173,10 @@ block content
                 td Start date
                 td End date
                 td Classification
+                td 2nd Classification
                 td Last score
                 td Actions
         each p in projects
             +projectRow(p)
+
+

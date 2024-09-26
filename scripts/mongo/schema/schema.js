@@ -1,6 +1,6 @@
 const conn = new Mongo()
 
-const db = conn.getDB('cw-project-radar')
+const db = conn.getDB('swforum-radar')
 db.dropDatabase()
 
 //
@@ -20,7 +20,7 @@ db.users.createIndex({ name: 1 }, { unique: true })
 // Projects
 //
 db.createCollection('projects')
-db.projects.createIndex({ cw_id: 1 }, { unique: true })
+db.projects.createIndex({ num_id: 1 }, { unique: true })
 db.projects.createIndex({ acronym: 1 })
 db.projects.createIndex({ rcn: 1 }, { unique: true })
 
@@ -28,6 +28,7 @@ db.projects.createIndex({ rcn: 1 }, { unique: true })
 // Radars
 //
 db.createCollection('radars')
+db.radars.createIndex({ num_id: 1 }, { unique: true })
 db.radars.createIndex({ slug: 1 }, { unique: true })
 db.radars.createIndex({ slug: 1, status: 1 })
 

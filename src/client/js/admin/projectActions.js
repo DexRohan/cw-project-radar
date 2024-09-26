@@ -1,46 +1,19 @@
-//
-// IMPORTS
-//
-// libraries
+
 import axios from 'axios'
 // app modules
 import showAlert from '../util/alert'
-
+import {addClassification, addScore} from './scoreAndClassify'
 //
 // create a new project
 //
 const createProject = async (prjData) => {
     try {
-        const {
-            acronym,
-            rcn,
-            title,
-            startDate,
-            endDate,
-            call,
-            type,
-            totalCost,
-            url,
-            fundingBodyLink,
-            cwurl,
-            teaser,
-        } = prjData
+        const {project, mtrl, classification} = prjData
         const res = await axios({
             method: 'POST',
             url: '/api/v1/project/',
             data: {
-                acronym,
-                rcn,
-                title,
-                startDate,
-                endDate,
-                call,
-                type,
-                totalCost,
-                url,
-                fundingBodyLink,
-                cwurl,
-                teaser,
+                project, mtrl, classification
             },
         })
 
@@ -50,6 +23,7 @@ const createProject = async (prjData) => {
                 location.assign('/admin/project')
             }, 1500)
         }
+
     } catch (err) {
         showAlert('error', err.response.data.message)
     }
@@ -80,10 +54,9 @@ const deleteProject = async (route, referrer) => {
 // UPDATE PROJECT
 //
 const updateProject = async (prjData) => {
-    console.log(prjData)
     try {
         const {
-            cw_id,
+            num_id,
             acronym,
             title,
             rcn,
@@ -100,7 +73,7 @@ const updateProject = async (prjData) => {
         } = prjData
         const res = await axios({
             method: 'PATCH',
-            url: `/api/v1/project/${prjData.cw_id}`,
+            url: `/api/v1/project/${prjData.num_id}`,
             data: {
                 acronym,
                 title,
@@ -120,7 +93,7 @@ const updateProject = async (prjData) => {
         if (res.data.status === 'success') {
             showAlert('success', 'Project updated.')
             window.setTimeout(() => {
-                location.assign('/admin/project')
+                location.assign(location.href)
             }, 1500)
         }
     } catch (err) {
@@ -132,22 +105,24 @@ const updateProject = async (prjData) => {
 // IMPORT PROJECTS FILE
 //
 const importProjects = async (data) => {
-    try {
-        const res = await axios({
-            method: 'PATCH',
-            url: '/api/v1/project',
-            data,
-        })
-
-        if (res.data.status === 'success') {
-            showAlert('success', res.data.messages.join('<br/>'))
+    axios.patch('/api/v1/project',data)
+    .then((res) => {
+        showAlert(res.data.status, res.data.message)
+        window.setTimeout(() => {
+            location.assign('/admin/project')
+        }, 5000)
+    })
+    .catch((err) => {
+        if (err.response) {
+            const { data } = err.response
+            showAlert(data.status, data.message)
+        } else if (err.request) {
+            showAlert('error', 'No response from the server.')
             window.setTimeout(() => {
                 location.assign('/admin/project')
             }, 5000)
         }
-    } catch (err) {
-        showAlert('error', err.response.data.message)
-    }
+    })
 }
 
 //

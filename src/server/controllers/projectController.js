@@ -10,13 +10,13 @@ const { Project } = require('../models/projectModel')
 const importHelper = require('./projects/projectsImportHelper')
 
 //
-// get by CW ID
+// get by num ID
 //
 // IMPORTANT - this function returns a Javascript object, NOT a mongoose model!
 //
-exports.getByCWId = async (cwid, addScores, addClassifications) => {
+exports.getByNumId = async (num_id, addScores, addClassifications) => {
     // 1) Build the aggregation by matchng the project
-    const query = Project.aggregate().match({ cw_id: { $eq: Number(cwid) } })
+    const query = Project.aggregate().match({ num_id: { $eq: Number(num_id) } })
 
     // 2) add score(s) if requested
     if (addScores) {
@@ -82,14 +82,15 @@ exports.getByRCN = async (rcn) => {
 //
 // Add a MTRL score to a project
 //
-exports.addCategory = async (cwid, data) => {
+exports.addCategory = async (num_id, data) => {
     // 1) Get the corresponding project
-    const project = await this.getByCWId(cwid)
-    if (!project) throw new AppError(`No project found with id ${cwid}`, 404)
+    const project = await this.getByNumId(num_id)
+    if (!project) throw new AppError(`No project found with id ${num_id}`, 404)
 
     // 2) Create new classification object
     await Classification.create({
         classification: data.classification,
+        secondary_classification: data.classification_2nd,
         project: project._id,
         classifiedOn: data.classifiedOn,
         classifiedBy: data.classifiedBy,
@@ -105,10 +106,10 @@ exports.addCategory = async (cwid, data) => {
 //
 // Add a MTRL score to a project
 //
-exports.addMTRLScore = async (cwid, data) => {
+exports.addMTRLScore = async (num_id, data) => {
     // 1) Get the corresponding project
-    const project = await this.getByCWId(cwid)
-    if (!project) throw new AppError(`No project found with id ${cwid}`, 404)
+    const project = await this.getByNumId(num_id)
+    if (!project) throw new AppError(`No project found with id ${num_id}`, 404)
 
     // 2) Create new score object
     await MTRLScore.create({
@@ -125,28 +126,28 @@ exports.addMTRLScore = async (cwid, data) => {
     return project
 }
 
-exports.importProjects = async (buffer) => {
-    // 1) Read the buffer into an array of objects
-    let result = await importHelper.parseTSV(buffer)
-    if (result.status !== 'success') {
-        throw new AppError(`Error parsing import file: ${result.messages[0]}`, 400)
-    }
-
-    // 2) Instantiate the data into Project documents (and store them right away)
-    result = await importHelper.createProjects(result)
-
-    // 3) Reverse the order of messages in result
-    result.messages.reverse()
-
-    // 4) return the result
-    return result
+exports.importProjects = (buffer, name) => {
+    return new Promise((resolve, reject) => {
+        // 1) Read the buffer into an array of objects
+        importHelper.parseCSV(buffer, name).then((result) => {
+            // 2) Now instantiate the projects. 
+            // At this point, status MAY be warning, indicating that not all rows were imported. Keep that for later.
+            return importHelper.createProjects(result.data, result.status) // creates a new result
+        }).then((result) => {
+            // 3) Call went through (though possibly with errors)
+            resolve(result)
+        }).catch((result) => {
+            // 4) reject the result as some unrecoverable error, i.e. no projects importet.
+            reject(result)
+        })
+    })
 }
 
 exports.getMatchingProjects = async (filter) => {
     let queryResult
 
     // base query
-    let query = Project.find().select({ cw_id: 1, _id: 0 })
+    let query = Project.find().select({ num_id: 1, _id: 0 })
 
     // if empty filter, all projecs match
     if (!filter.tags || filter.tags.length === 0) {
@@ -162,7 +163,7 @@ exports.getMatchingProjects = async (filter) => {
     }
 
     // reduce the returned objects to a number array
-    return queryResult.map((prj) => prj.cw_id)
+    return queryResult.map((prj) => prj.num_id)
 }
 
 exports.findProjects = async (criteria) => {
@@ -175,7 +176,7 @@ exports.findProjects = async (criteria) => {
             $language: 'en',
             $caseSensitive: caseSensitive,
         },
-    }).select('cw_id rcn acronym title -_id')
+    }).select('num_id rcn acronym title -_id')
 
     let queryResult = await query
 

@@ -9,6 +9,8 @@ const catchAsync = require('../utils/catchAsync')
 const handlerFactory = require('./handlerFactory')
 // const logger = require('./../utils/logger')
 const { Project } = require('../models/projectModel')
+const { Classification } = require('../models/classificationModel')
+const { MTRLScore } = require('../models/mtrlScoreModel')
 const projectController = require('../controllers/projectController')
 const v = require('../utils/validator')
 
@@ -17,56 +19,112 @@ const v = require('../utils/validator')
 //
 // store all uploads in memory
 const multerStorage = multer.memoryStorage()
-// filter out anything that is not text/csv or text/tsv
-const multerFilter = (req, file, cb) => {
-    if (file.mimetype.startsWith('text')) {
-        cb(null, true)
-    } else {
-        cb(new AppError('Not a text file!', 400), false)
-    }
-}
+
 // multer middleware to store multipart import-file data in the request object
 const upload = multer({
     storage: multerStorage,
-    fileFilter: multerFilter,
 })
 
 exports.importFile = upload.single('importfile')
 // actually imports the projects
 exports.importProjects = catchAsync(async (req, res, next) => {
+
     // 1) Check if there is a file in the req object
-    if (!req.file) return next()
+    if (!req.file) {
+        res.status(400).json({
+            status: 'error',
+            message: 'No input file provided.'
+        })
+        return
+    } 
 
-    // 2) Pull the file's buffer and pass it onto the project controller
-    const result = await projectController.importProjects(req.file.buffer)
-
-    // 3 If all ok return a success / 200 OK response
-    res.status(201).json({
-        status: 'success',
-        messages: result.messages,
+    // 2) Let the project controller import the files
+    projectController.importProjects(req.file.buffer, req.file.originalname)
+    .then((result) => {
+        // // 3) If all ok return a success / 200 OK response
+        res.status(201).json({
+            status: result.status,
+            message: result.message
+        })
+        return
+    }).catch((err) => {
+        res.status(400).json({
+            status: 'error',
+            message: err.message
+        })
+        return
     })
 })
 
-exports.createProject = handlerFactory.createOne(
-    Project,
-    'cw_id',
-    'hasClassifications',
-    'hasScores'
-)
 exports.getProject = handlerFactory.getOne(Project)
 exports.getAllProjects = handlerFactory.getAll(Project)
-exports.deleteProject = handlerFactory.deleteOne(Project)
+
+exports.createProject = catchAsync(async (req, res, next) => {
+    // create the project
+    const prj = handlerFactory.filterFields(req.body.project, [])
+    const project = await Project.create(prj)
+
+    // add the MTRL score (if any)
+    if (req.body.mtrl) {
+        const data = req.body.mtrl
+        await MTRLScore.create({
+            project: project._id,
+            scoringDate: data.scoringDate,
+            mrl: data.mrl,
+            trl: data.trl,
+            description: data.description,
+        })
+        // update the project
+        await Project.updateOne({ _id: project._id }, { hasScores: true })
+    }
+
+    // add classification (if any)
+    if (req.body.classification) {
+        const data = req.body.classification
+        await Classification.create({
+            project: project._id,
+            classification: data.classification,
+            secondary_classification: data.classification_2nd,
+            classifiedOn: data.classifiedOn,
+            classifiedBy: data.classifiedBy,
+            changeSummary: data.changeSummary,
+        })
+        // update the project
+        await Project.updateOne({ _id: project._id }, { hasClassifications: true })
+    }
+
+    res.status(200).json({
+        status: 'success',
+        data: "none",
+    })
+
+})
+
+exports.deleteProject = catchAsync(async (req, res, next) => {
+    // delete all associated scores
+    await MTRLScore.deleteMany({project: req.params.id})
+    // delete all its classifications
+    await Classification.deleteMany({project: req.params.id})
+    //finally delete the project itself
+    await Project.findByIdAndDelete(req.params.id)
+
+    // return project if found
+    res.status(200).json({
+        status: 'success',
+    })
+    
+})
 
 exports.updateProject = catchAsync(async (req, res, next) => {
     // 1) The id must be a valid CW id, not an ObjectID!
-    const cwid = req.params.id
-    if (!cwid || isNaN(cwid)) {
-        throw new AppError('Missing or non-number cyberwatching id in request.', 400)
+    const num_id = req.params.id
+    if (!num_id || isNaN(num_id)) {
+        throw new AppError('Missing or non-number swforum id in request.', 400)
     }
 
     // 2) Filter out disallowed fields from the request body
     const doc = handlerFactory.filterFields(req.body, [
-        'cw_id',
+        'num_id',
         'hasClassifications',
         'hasScores',
         'classification',
@@ -74,7 +132,7 @@ exports.updateProject = catchAsync(async (req, res, next) => {
     ])
 
     // 3) go straight to Project Model to update
-    const project = await Project.findOneAndUpdate({ cw_id: cwid }, doc, {
+    const project = await Project.findOneAndUpdate({ num_id: num_id }, doc, {
         new: true,
         runValidators: true,
     })
@@ -89,10 +147,10 @@ exports.updateProject = catchAsync(async (req, res, next) => {
     })
 })
 
-exports.getByCWId = catchAsync(async (req, res, next) => {
-    // cwid  checking
-    if (!req.params.cwid || isNaN(req.params.cwid)) {
-        throw new AppError('Missing or non-number cwid in request.', 400)
+exports.getByNumId = catchAsync(async (req, res, next) => {
+    // numid  checking
+    if (!req.params.num_id || isNaN(req.params.num_id)) {
+        throw new AppError('Missing or non-number num_id in request.', 400)
     }
     // scores param checking
     let addScores
@@ -108,14 +166,14 @@ exports.getByCWId = catchAsync(async (req, res, next) => {
     addClassifications = req.query.class
 
     // fetch or find project
-    const project = await projectController.getByCWId(
-        req.params.cwid,
+    const project = await projectController.getByNumId(
+        req.params.num_id,
         addScores,
         addClassifications
     )
 
     if (!project) {
-        throw new AppError(`No project found with cwid ${req.params.cwid}`, 404)
+        throw new AppError(`No project found with id ${req.params.numid}`, 404)
     }
 
     // return project if found
@@ -148,11 +206,11 @@ exports.getByRCN = catchAsync(async (req, res, next) => {
 //
 exports.addCategory = catchAsync(async (req, res, next) => {
     // 1) fetch data
-    const { cwid } = req.params
+    const { numid } = req.params
     const categoryData = req.body
 
     // 2) add score and save the proejct
-    const classification = await projectController.addCategory(cwid, categoryData)
+    const classification = await projectController.addCategory(numid, categoryData)
 
     // 3) Assemble successful response
     res.status(201).json({
@@ -166,11 +224,11 @@ exports.addCategory = catchAsync(async (req, res, next) => {
 //
 exports.addMTRLScore = catchAsync(async (req, res, next) => {
     // 1) fetch data
-    const { cwid } = req.params
+    const { numid } = req.params
     const scoreData = req.body
 
     // 2) add score and save the proejct
-    const score = await projectController.addMTRLScore(cwid, scoreData)
+    const score = await projectController.addMTRLScore(numid, scoreData)
 
     // 3) Assemble successful response
     res.status(201).json({

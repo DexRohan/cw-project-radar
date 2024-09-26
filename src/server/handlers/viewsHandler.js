@@ -16,8 +16,9 @@ const { roundDec } = require('../../common/util/maths')
 const User = require('../models/userModel')
 const Radar = require('../models/radarModel')
 const { Project } = require('../models/projectModel')
-const { jrcTaxonomy } = require('./../../common/datamodel/jrc-taxonomy')
-const { validCwId } = require('../utils/validator')
+// const { jrcTaxonomy } = require('./../../common/datamodel/jrc-taxonomy')
+const { acmCCS } = require('./../../common/datamodel/acm-ccs')
+const { validSwId } = require('../utils/validator')
 
 //
 // MIDDLEWARE
@@ -50,7 +51,7 @@ exports.getEditions = catchAsync(async (req, res, next) => {
 //
 exports.showMain = catchAsync(async (req, res, next) => {
     // 1) Fetch some key figures from the DB
-    const kpis = (
+    let kpis = (
         await Project.aggregate([
             {
                 $group: {
@@ -64,10 +65,19 @@ exports.showMain = catchAsync(async (req, res, next) => {
             },
         ])
     )[0]
-    kpis.calls = kpis.calls.length // reduce calls array to its length
-    kpis.span = moment(kpis.end).diff(kpis.start, 'months') + 1 // reduce start and end to months
-    kpis.span = roundDec(kpis.span / 12, 1) // in years, with one decimal
-    kpis.totalCost = roundDec(kpis.totalCost / 1000000000, 1) // budget in €bn
+    if (kpis) {
+        kpis.span = moment(kpis.end).diff(kpis.start, 'months') + 1 // reduce start and end to months
+        kpis.span = roundDec(kpis.span / 12, 1) // in years, with one decimal
+        kpis.calls = kpis.calls.length // reduce calls array to its length
+        kpis.totalCost = roundDec(kpis.totalCost / 1000000000, 1) // budget in €bn
+    } else {
+        kpis = {
+            span: 0,
+            calls: 0,
+            projects: 0,
+            totalCost: 0.0
+        }
+    }
 
     // TODO expand on default content.
     res.status(200).render('main', {
@@ -97,7 +107,7 @@ exports.showRadar = catchAsync(async (req, res, next) => {
         title: radar.name,
         pageclass,
         radar,
-        jrcTaxonomy,
+        acmCCS,
     })
 })
 
@@ -238,7 +248,7 @@ exports.editRadar = catchAsync(async (req, res, next) => {
 //
 exports.manageProjects = catchAsync(async (req, res, next) => {
     // 1) Fetch all Projects
-    const projects = await new APIFeatures(Project.find(), { sort: 'cw_id' }).filter().sort().query
+    const projects = await new APIFeatures(Project.find(), { sort: 'num_id' }).filter().sort().query
     if (!projects) {
         return next(new AppError(`No proejcts found AT ALL in this application.`, 404))
     }
@@ -250,6 +260,7 @@ exports.manageProjects = catchAsync(async (req, res, next) => {
             if (prj.hasClassifications) {
                 let segment = await classificationController.getClassification(prj._id, Date.now())
                 prj.classification = segment.classification
+                prj.secondary_classification = segment.secondary_classification
             }
             // add MTRL score
             if (prj.hasScores) {
@@ -264,6 +275,7 @@ exports.manageProjects = catchAsync(async (req, res, next) => {
         title: 'Manage projects',
         pageclass: 'manage-projects',
         projects,
+        acmCCS
     })
 })
 
@@ -290,7 +302,7 @@ exports.editProject = catchAsync(async (req, res, next) => {
         project,
         classifications,
         mtrlScores,
-        jrcTaxonomy,
+        acmCCS,
     })
 })
 
@@ -304,11 +316,11 @@ exports.editProject = catchAsync(async (req, res, next) => {
 //
 exports.getProjectWidget = catchAsync(async (req, res, next) => {
     // 1) Check parameters
-    if (req.params.cwid && !validCwId(req.params.cwid)) throw new AppError('Invalid project CW id.')
+    if (req.params.numid && !validSwId(req.params.numid)) throw new AppError('Invalid project CW id.')
 
     // 2) Get the latest MTRL submission for the given project
     const data = await Project.aggregate()
-        .match({ cw_id: { $eq: Number(req.params.cwid) } })
+        .match({ num_id: { $eq: Number(req.params.numid) } })
         .lookup({
             from: 'mtrlscores',
             let: { prjID: '$_id' },
@@ -321,7 +333,7 @@ exports.getProjectWidget = catchAsync(async (req, res, next) => {
         })
         .exec()
     if (!data || data.length < 1)
-        throw new AppError(`No data found for widget for project no. ${req.params.cwid}`)
+        throw new AppError(`No data found for widget for project no. ${req.params.numid}`)
 
     // 3) Render the widget
     res.status(200).render('widgets/project.pug', {

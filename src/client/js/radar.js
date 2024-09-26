@@ -19,7 +19,8 @@ import {
 import { createRadar, updateRadar, deleteRadar, advanceRadar } from './admin/radarActions'
 import { createProject, deleteProject, updateProject, importProjects } from './admin/projectActions'
 import { addClassification, addScore } from './admin/scoreAndClassify'
-import { getName } from '../../common/datamodel/jrc-taxonomy'
+// import { getName } from '../../common/datamodel/jrc-taxonomy'
+import { getName } from '../../common/datamodel/acm-ccs'
 import { searchProjects, clearProjects } from './radar/search.js'
 import { fetchRendering, fetchStats } from './radar/asyncRendering'
 import { RadarCoordinates } from '../../common/widgets/radar-location/radar-coords'
@@ -263,7 +264,7 @@ if (radarSection) {
 //
 // Show JRC tag filter modal form
 //
-const jrcTagFormButton = document.querySelector('#jrctagsfilter button')
+const jrcTagFormButton = document.querySelector('#acmtagsfilter button')
 if (jrcTagFormButton) {
     // wire up the button to show the filter tags meny
     jrcTagFormButton.addEventListener('click', (event) => {
@@ -409,7 +410,6 @@ if (deleteRadarLinks) {
     deleteRadarLinks.forEach((link) => {
         link.addEventListener('click', async (event) => {
             event.preventDefault()
-            console.log(event.path[1].getAttribute('route'))
             await deleteRadar(event.path[1].getAttribute('route'), location.href)
         })
     })
@@ -451,19 +451,46 @@ if (newProjectForm) {
     newProjectForm.addEventListener('submit', async (event) => {
         event.preventDefault()
         const values = {
-            acronym: document.getElementById('acronym').value,
-            rcn: document.getElementById('rcn').value,
-            title: document.getElementById('title').value,
-            startDate: document.getElementById('startdate').value,
-            endDate: document.getElementById('enddate').value,
-            call: document.getElementById('fundingcall').value,
-            type: document.getElementById('projecttype').value,
-            totalCost: document.getElementById('totalCost').value,
-            url: document.getElementById('url').value,
-            fundingBodyLink: document.getElementById('fundingbodylink').value,
-            cwurl: document.getElementById('cwprojecthublink').value,
-            teaser: document.getElementById('teaser').value,
+            // the Project
+            project: {
+                acronym: document.getElementById('acronym').value,
+                rcn: document.getElementById('rcn').value,
+                title: document.getElementById('title').value,
+                startDate: document.getElementById('startdate').value,
+                endDate: document.getElementById('enddate').value,
+                call: document.getElementById('fundingcall').value,
+                type: document.getElementById('projecttype').value,
+                totalCost: document.getElementById('totalCost').value,
+                url: document.getElementById('url').value,
+                fundingBodyLink: document.getElementById('fundingbodylink').value,
+
+                cwurl: document.getElementById('swprojecthublink').value,
+                teaser: document.getElementById('teaser').value,
+                tags: []
+
+            },
+            // MTRL score (if any)
+            mtrl: {
+                mrl: document.getElementById('mrl').value,
+                trl: document.getElementById('trl').value,
+                scoringDate: document.getElementById('scoringdate').value,
+                description: document.getElementById('scoreDescription').value,
+            },
+            // classification (if any)
+            classification: {
+                classification: document.getElementById('classification').value,
+                classification_2nd: document.getElementById('classification_2nd').value,
+                classifiedBy: 'SWForum', // for now this is hardcoded when using the web UI
+                changeSummary: document.getElementById('changeSummary').value
+            }
+
         }
+        // add the taxonomy tax to the project tags
+        document.querySelectorAll('.term:checked,.dimension-header:checked').forEach((c) => {
+            values.project.tags.push(c.value)
+        })
+
+
         await createProject(values)
     })
 }
@@ -503,7 +530,7 @@ if (editProjectForm) {
         event.preventDefault()
         const values = {
             id: document.getElementById('projectid').value,
-            cw_id: document.getElementById('project_cwid').value,
+            num_id: document.getElementById('project_numid').value,
             acronym: document.getElementById('acronym').value,
             rcn: document.getElementById('rcn').value,
             title: document.getElementById('title').value,
@@ -514,7 +541,7 @@ if (editProjectForm) {
             totalCost: document.getElementById('totalCost').value,
             url: document.getElementById('url').value,
             fundingBodyLink: document.getElementById('fundingbodylink').value,
-            cwurl: document.getElementById('cwprojecthublink').value,
+            cwurl: document.getElementById('swprojecthublink').value,
             teaser: document.getElementById('teaser').value,
         }
         await updateProject(values)
@@ -541,11 +568,12 @@ const addCategoryForm = document.getElementById('add-category-form')
 if (addCategoryForm) {
     addCategoryForm.addEventListener('submit', async (event) => {
         event.preventDefault()
-        const cw_id = document.getElementById('cwid').value
+        const num_id = document.getElementById('numid').value
         const classification = document.getElementById('classification').value
-        const classifiedBy = 'Cyberwatching' // for now this is hardcoded when using the web UI
+        const classification_2nd = document.getElementById('classification_2nd').value
+        const classifiedBy = 'SWForum' // for now this is hardcoded when using the web UI
         const changeSummary = document.getElementById('changeSummary').value
-        addClassification(cw_id, classification, classifiedBy, changeSummary)
+        addClassification(num_id, classification, classification_2nd, classifiedBy, changeSummary)
     })
 }
 
@@ -556,12 +584,12 @@ const addScoreForm = document.getElementById('add-score-form')
 if (addScoreForm) {
     addScoreForm.addEventListener('submit', async (event) => {
         event.preventDefault()
-        const cw_id = document.getElementById('cwid').value
+        const num_id = document.getElementById('numid').value
         const mrl = document.getElementById('mrl').value
         const trl = document.getElementById('trl').value
         const scoringDate = document.getElementById('scoringdate').value
         const description = document.getElementById('scoreDescription').value
-        addScore(cw_id, mrl, trl, scoringDate, description)
+        addScore(num_id, mrl, trl, scoringDate, description)
     })
 }
 
@@ -599,7 +627,7 @@ if (taxonomySubmit) {
     taxonomySubmit.addEventListener('submit', async (event) => {
         event.preventDefault()
         const values = {
-            cw_id: document.getElementById('project_cwid').value,
+            num_id: document.getElementById('project_numid').value,
             tags: [],
         }
         document.querySelectorAll('.term:checked,.dimension-header:checked').forEach((c) => {

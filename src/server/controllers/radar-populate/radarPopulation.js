@@ -2,7 +2,7 @@
 // IMPORTS
 //
 // libraries
-// const moment = require('moment')
+const moment = require('moment')
 const simpleStats = require('simple-statistics')
 // modules
 // const APIFeatures = require('../utils/apiFeatures')
@@ -11,7 +11,6 @@ const classificationController = require('../classificationController')
 const mtrlScoresController = require('../mtrlScoresController')
 // const Radar = require('../models/radarModel')
 // const renderer = require('./radar-render/renderer')
-const { Blip, RadarData } = require('../../models/radarDataModel')
 const { Project } = require('../../models/projectModel')
 
 //
@@ -19,6 +18,7 @@ const { Project } = require('../../models/projectModel')
 //
 const rings = process.env.MODEL_RINGS.split(',').map((e) => e.trim())
 const segments = process.env.MODEL_SEGMENTS.split(',').map((e) => e.trim())
+const isNew = process.env.IS_NEW | 6
 
 //
 // Compile the blips for all projects that are in scope for the radar
@@ -49,9 +49,8 @@ exports.compileRadarPopulation = async (cutOffDate) => {
 
     // 3) Map all projects into the "data" structure.
     await mapProjectsToData(projects, data, cutOffDate)
-
     // 4) Create a RadarData object from this data structure of the 90's called "data"
-    const radarData = createRadarData(data)
+    const radarData = createRadarData(data, cutOffDate)
 
     // 5) Finally return the radar data
     return radarData
@@ -68,8 +67,12 @@ const mapProjectsToData = async (projects, data, cutOffDate) => {
                 prj._id,
                 cutOffDate.toDate()
             )
+            // push the secondary segment into the project, to calculate the sub-secment in the rendering phase
+            prj.segment_2 = segment.secondary_classification
+            // set the main segment as mefore
             segment = segment.classification
             const ring = calculateRing(prj, cutOffDate)
+
             // If the project has a score, fetch and add the score too as we need that later anyway.
             let score = undefined
             if (prj.hasScores) {
@@ -85,49 +88,50 @@ const mapProjectsToData = async (projects, data, cutOffDate) => {
 
 //
 // DOMAIN-SPECIFIC ring calculator.
-// TODO - find a way to get this configurable
 //
 const calculateRing = (project, radarDate) => {
     let testDate = radarDate.clone()
 
-    testDate.subtract(2, 'years')
-    if (project.endDate < testDate.toDate()) return rings[4] // Drop
-
-    testDate.add(1, 'years')
     if (project.endDate < testDate.toDate()) return rings[3] // Hold
 
     testDate.add(1, 'years')
     if (project.endDate < testDate.toDate()) return rings[0] // Adopt
 
-    testDate.add(6, 'months').toDate()
+    testDate.add(1, 'years')
     if (project.endDate < testDate.toDate()) return rings[1] // Trial
 
+    // testDate.add(1, 'years')
+    // if (project.endDate < testDate.toDate()) 
+    
+    else
     return rings[2] // Assess
+
 }
 
 //
 // transform the ugly data "structure" into a RadarData entity (just as ugly)
-const createRadarData = (data) => {
-    const radarData = new RadarData({})
-    radarData.data = new Map()
+const createRadarData = (data, cutOffDate) => {
+    const radarData = new Map()
     for (const [segKey, segMap] of data.entries()) {
         const segDataMap = new Map()
         for (const [ringKey, entries] of segMap.entries()) {
             const stats = calculateStatistics(entries)
             const ringData = []
-            entries.forEach((e) => {
-                const blip = new Blip({
-                    project: e.prj._id,
-                    tags: e.prj.tags,
-                    cw_id: e.prj.cw_id, // temporary
-                    prj_acronym: e.prj.acronym, // temporary
+            entries.forEach((entry) => {
+                const blip = {
+                    isNew: calcIsNew(entry.prj.createDate, cutOffDate),
+                    project: entry.prj._id,
+                    tags: entry.prj.tags,
+                    num_id: entry.prj.num_id, // temporary
+                    prj_acronym: entry.prj.acronym, // temporary
                     segment: segKey, // temporary
+                    segment_2: entry.prj.segment_2,
                     ring: ringKey, // temporary
-                })
-                if (e.score) {
-                    blip.trl = e.score.trl
-                    blip.mrl = e.score.mrl
-                    blip.score = e.score.score
+                }
+                if (entry.score) {
+                    blip.trl = entry.score.trl
+                    blip.mrl = entry.score.mrl
+                    blip.score = entry.score.score
                     blip.median = stats.median
                     blip.performance = blip.score - blip.median
                     blip.min = stats.min
@@ -137,10 +141,16 @@ const createRadarData = (data) => {
             })
             segDataMap.set(ringKey, ringData)
         }
-        radarData.data.set(segKey, segDataMap)
+        radarData.set(segKey, segDataMap)
     }
 
     return radarData
+}
+
+const calcIsNew = (createDate, cutOffDate) => {
+    const create = moment(createDate)
+    const compare = cutOffDate.subtract(isNew, 'months')
+    return compare.isBefore(create)
 }
 
 //

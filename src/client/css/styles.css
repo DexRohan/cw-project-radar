@@ -430,6 +430,11 @@ svg g line {
     stroke-width: 5;
 }
 
+svg g line.sub {
+    stroke-width: 1;
+    stroke-dasharray: 10, 10;
+}
+
 /*
  * Radar tables
  */
@@ -814,6 +819,9 @@ div.ops * {
     cursor: pointer;
 }
 /* elements in the modal to select the tags */
+/* form.form--filter-tags ul, form.form--edit-tags ul { */
+
+form.form--new-project ul,
 form.form--filter-tags ul,
 form.form--edit-tags ul {
     list-style: none;

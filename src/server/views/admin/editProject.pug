@@ -1,10 +1,6 @@
 extends ../structure/_base
 
 
-//- mixin action(actionClass, label, route, imageStr)
-//-     a(route=route, class=actionClass, style="cursor: pointer; margin: 0 2px;")
-//-         img(width=16, alt=label, src=imageStr)
-
 mixin classificationRow(classification)
     -function prettyDate(date) {
         -var d = date.getDate(date);
@@ -16,6 +12,7 @@ mixin classificationRow(classification)
     tr
         td #{prettyDate(classification.classifiedOn)}
         td #{classification.classification}
+        td #{classification.secondary_classification}
         td #{classification.classifiedBy}
         td #{classification.changeSummary}
 
@@ -40,6 +37,10 @@ mixin scaleOptions()
     each val in [1, 2, 3, 4, 5, 6, 7, 8, 9]
         option(value=val)= val
 
+mixin classificationOptions()
+    each val in process.env.MODEL_SEGMENTS.split(',').map(e => e.trim())
+        option(value=val)= val 
+
 block content
 
     h2 Edit project #{project.acronym}
@@ -47,7 +48,7 @@ block content
         .form__group
             input#projectid.form__input(type='hidden', required, value=project._id)
         .form__group
-            input#project_cwid.form__input(type='hidden', required, value=project.cw_id)
+            input#project_numid.form__input(type='hidden', required, value=project.num_id)
         .form__group
             label.form__label(for='acronym') Acronym
             input#acronym.form__input(type='string', required, value=project.acronym)
@@ -79,8 +80,8 @@ block content
             label.form__label(for='fundingbodylink') Funding body entry
             input#fundingbodylink.form__input(type='string', value=project.fundingBodyLink)
         .form__group
-            label.form__label(for='cwprojecthublink') CW ProjectHUB link
-            input#cwprojecthublink.form__input(type='string', value=project.cwurl)
+            label.form__label(for='swprojecthublink') SWForum ProjectHUB link
+            input#swprojecthublink.form__input(type='string', value=project.cwurl)
         .form__group
             label.form__label(for='teaser') Teaser
             textarea#teaser.form__input(type='string', required, cols="70", rows="10")= project.teaser
@@ -102,7 +103,7 @@ block content
 
     .addscore-form: form.form.form--add-score#add-score-form
         .form__group
-            input#cwid.form__input(type='hidden', required, value=project.cw_id)
+            input#numid.form__input(type='hidden', required, value=project.num_id)
         .form__group
             label.form__label(for="mrl") MRL
             select#mrl(name="mrl")
@@ -126,6 +127,7 @@ block content
             tr
                 td When
                 td Classification
+                td 2nd classification
                 td By
                 td Reason
         each c in classifications
@@ -133,31 +135,62 @@ block content
     
     .addcategory-form: form.form.form--add-category#add-category-form
         .form__group
-            input#cwid.form__input(type='hidden', required, value=project.cw_id)
+            input#numid.form__input(type='hidden', required, value=project.num_id)
         .form__group
             label.form__label(for="classification") Category
             select#classification(name="classification")
-                option(value="Secure Systems")= "Secure Systems"
-                option(value="Verification & Assurance")= "Verification & Assurance"
-                option(value="Operational Risk")= "Operational Risk"
-                option(value="Identity & Privacy")= "Identity & Privacy"
-                option(value="Cybersecurity Governance")= "Cybersecurity Governance"
-                option(value="Human Aspects")= "Human Aspects"
+                +classificationOptions()
+        .form__group
+            label.form__label(for="classification_2nd") 2nd Category
+            select#classification_2nd(name="classification_2nd")
+                option(value='')= "- no secondary classification -"
+                +classificationOptions()
         .form__group
             label.form__label(for='changeSummary') Reason
             input#changeSummary.form__input(type='string', required)
         .form__group
             button.btn#btn--add-category Add
 
+    //- h2 Edit project tags
+    //- .edittags-form: form.form.form--edit-tags#edit-tags-form
+    //-     +jrcDimension(jrcTaxonomy.cybersecurity)
+    //-     +jrcDimension(jrcTaxonomy.sectors)
+    //-     +jrcDimension(jrcTaxonomy.technology)
+    //-     .form__group
+    //-         button.btn#btn--edit-Tags Set tags
+
     h2 Edit project tags
     .edittags-form: form.form.form--edit-tags#edit-tags-form
-        +jrcDimension(jrcTaxonomy.cybersecurity)
-        +jrcDimension(jrcTaxonomy.sectors)
-        +jrcDimension(jrcTaxonomy.technology)
+        +acmDimension(acmCCS.computerSystems)
+        +acmDimension(acmCCS.softwareEngineering)
+        +acmDimension(acmCCS.computationTheory)
+        +acmDimension(acmCCS.computingMath)
+        +acmDimension(acmCCS.infoSystems)
+        +acmDimension(acmCCS.securityPrivacy)
+        +acmDimension(acmCCS.humanComputing)
+        +acmDimension(acmCCS.computingmethods)
+        +acmDimension(acmCCS.networks)
+        +acmDimension(acmCCS.appliedComputing)
         .form__group
             button.btn#btn--edit-Tags Set tags
 
-mixin jrcDimension(dimension)
+//- mixin jrcDimension(dimension)
+//-     ul: li
+//-         - if (project.tags.includes(dimension.tag))
+//-             input.dimension-header(type='checkbox', name=dimension.tag, value=dimension.tag, checked)
+//-         - else 
+//-             input.dimension-header(type='checkbox', name=dimension.tag, value=dimension.tag)
+//-         label(for=dimension.tag)= dimension.name
+//-         li: ul
+//-             each term in dimension.terms
+//-                 li 
+//-                     - if (project.tags.includes(term.tag))
+//-                         input.term(type='checkbox', name=term.tag, value=term.tag, checked)
+//-                     - else 
+//-                         input.term(type='checkbox', name=term.tag, value=term.tag)
+//-                     label(for=term.tag)= term.name
+
+mixin acmDimension(dimension)
     ul: li
         - if (project.tags.includes(dimension.tag))
             input.dimension-header(type='checkbox', name=dimension.tag, value=dimension.tag, checked)

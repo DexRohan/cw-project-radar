@@ -8,13 +8,13 @@
         "selfsign": "openssl genrsa -out key.pem && openssl req -new -key key.pem -out csr.peM && openssl x509 -req -days 9999 -in csr.pem -signkey key.pem -out cert.pem && rm csr.pem",
         "build": "rm -rf dist && mkdir dist && npm run build:c && npm run build:s",
         "build:c": "rm -rf dist/client && npm run build:c:pug && npm run build:c:js && npm run build:c:static",
-        "build:c:pug": "pug -O '{module: true}' -c -D --name-after-file -o src/client/views src/client/views",
+        "build:c:pug": "pug -O {module:true} -c -D --name-after-file -o src/client/views src/client/views",
         "build:c:js": "parcel build src/client/js/*.js --no-source-maps --target browser --bundle-node-modules --out-dir dist/client",
         "build:c:static": "cp -R src/client/css dist/client && cp -R src/client/img dist/client",
         "build:s": "rm -rf dist/server && mkdir dist/server && cp -R src/server dist && cp -R src/common dist && cp .env.prod dist/.env",
         "dev": "cp .env.dev .env && nodemon src/server/server.js",
         "devwin": "copy .env.dev .env && nodemon src/server/server.js",
-        "dev:watch:pug": "pug -c -w --name-after-file -o src/client/views src/client/views",
+        "dev:watch:pug": "pug -O {module:true} -c -w --name-after-file -o src/client/views src/client/views",
         "dev:watch:js": "parcel watch --dist-dir src/client src/client/js/*.js",
         "start": "cp .env.prod .env && node server/server.js",
         "startwin": "copy .env.prod .env && node server/server.js",
@@ -25,7 +25,7 @@
         "test": "jest"
     },
     "keywords": [
-        "cyberwatching.eu",
+        "swforum.eu",
         "project",
         "radar",
         "EC",
@@ -35,7 +35,7 @@
     "license": "MIT",
     "repository": {
         "type": "git",
-        "url": "https://github.com/micheldrescher/cw-project-radar.git"
+        "url": "https://github.com/SWForum-eu/swforum-radar.git"
     },
     "dependencies": {
         "@fast-csv/parse": "^4.3.6",
@@ -69,7 +69,6 @@
         "simple-statistics": "^7.3.1",
         "slugify": "^1.4.5",
         "streamifier": "^0.1.1",
-        "svgdom": "^0.1.8",
         "validator": "^13.1.17",
         "winston": "^3.3.3",
         "xss-clean": "^0.1.1"

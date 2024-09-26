@@ -152,8 +152,9 @@ const clickBlip = () => {
         e.stopPropagation()
         const dataSet = e.target.parentNode.dataset
         showProjectData(
-            dataSet.cwId,
+            dataSet.numId,
             dataSet.segment,
+            dataSet.segment2,
             dataSet.ring,
             JSON.parse(dataSet.performance),
             dataSet.jrcTags
